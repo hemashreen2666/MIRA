@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+
+# Env / secrets
+.env
+
+# Local database
+backend/mira.db
+*.sqlite3
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Editor / OS
+.DS_Store
+.vscode/

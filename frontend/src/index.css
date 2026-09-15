@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: #0B1119;
+  color: #F4F7FA;
+  font-family: 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Card weight tiers — primary panels carry the hero/interactive moments,
+   quiet panels sit back so the dashboard doesn't read as a flat stack of
+   identical cards. */
+.panel-primary {
+  background: linear-gradient(165deg, rgba(255,255,255,0.055), rgba(255,255,255,0.015));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.09);
+}
+
+.panel-quiet {
+  background: rgba(255,255,255,0.018);
+  border: 1px solid rgba(255,255,255,0.055);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid #5FE3E0;
+  outline-offset: 2px;
+}

@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mira_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mira_user
+      POSTGRES_PASSWORD: mira_password
+      POSTGRES_DB: mira_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - mira_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mira_user -d mira_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: mira_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://mira_user:mira_password@db:5432/mira_db
+      CORS_ORIGINS: http://localhost:5173
+      APP_ENV: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/backend/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  mira_pg_data:
