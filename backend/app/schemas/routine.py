@@ -25,3 +25,15 @@ class RoutineCompleteStepResponse(BaseModel):
     completedSteps: int
     totalSteps: int
     steps: List[RoutineStepOut]
+
+
+class RoutineTaskProgressItem(BaseModel):
+    routine_id: UUID
+    date: str
+    task_name: str
+    complete: bool
+    created_at: str
+
+
+class RoutineTaskProgressHistoryResponse(BaseModel):
+    items: List[RoutineTaskProgressItem]

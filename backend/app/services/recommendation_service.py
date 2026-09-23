@@ -97,6 +97,9 @@ def generate_recommendations_for_analysis(db: Session, user_id: UUID, analysis: 
     db.commit()
     for row in current:
         db.refresh(row)
+    analysis.recommendation_summary = " ".join(f"{row.title}: {row.body}" for row in current)
+    db.commit()
+    db.refresh(analysis)
     return current
 
 

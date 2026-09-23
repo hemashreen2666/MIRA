@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user_id
 from app.core.database import get_db
-from app.schemas.routine import RoutineProgressResponse, RoutineStepOut, RoutineCompleteStepResponse
+from app.schemas.routine import (
+    RoutineProgressResponse,
+    RoutineStepOut,
+    RoutineCompleteStepResponse,
+    RoutineTaskProgressHistoryResponse,
+    RoutineTaskProgressItem,
+)
 from app.services import routine_service
 from app.utils.errors import MiraAPIError
 
@@ -30,6 +36,23 @@ def get_routine(db: Session = Depends(get_db), user_id: UUID = Depends(get_curre
 def get_progress(db: Session = Depends(get_db), user_id: UUID = Depends(get_current_user_id)):
     _, steps, percent = routine_service.get_routine_progress(db, user_id)
     return RoutineProgressResponse(steps=_to_out(steps), percentComplete=percent)
+
+
+@router.get("/history", response_model=RoutineTaskProgressHistoryResponse, summary="Get routine task completion history")
+def get_history(db: Session = Depends(get_db), user_id: UUID = Depends(get_current_user_id)):
+    rows = routine_service.get_task_progress_history(db, user_id)
+    return RoutineTaskProgressHistoryResponse(
+        items=[
+            RoutineTaskProgressItem(
+                routine_id=row.routine_id,
+                date=row.progress_date.isoformat(),
+                task_name=row.task_name,
+                complete=row.complete,
+                created_at=row.created_at.isoformat(),
+            )
+            for row in rows
+        ]
+    )
 
 
 @router.patch(

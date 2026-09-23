@@ -1,32 +1,39 @@
 import {
   LayoutGrid,
   ScanFace,
-  HeartPulse,
   ListChecks,
   LineChart,
   Settings,
+  History,
+  Sparkles,
 } from "lucide-react";
 import { navItems } from "../data/mockData.js";
 
 const icons = {
   dashboard: LayoutGrid,
   skin: ScanFace,
-  wellness: HeartPulse,
   routine: ListChecks,
   insights: LineChart,
   settings: Settings,
+  history: History,
+  products: Sparkles,
 };
 
 // Skin Analysis and Skincare Routine are intentionally opened from the
 // dashboard launch cards, keeping the persistent navigation uncluttered.
-const visibleNavItems = navItems.filter((item) => item.id !== "skin" && item.id !== "routine");
+const visibleNavItems = [
+  ...navItems.filter((item) => item.id !== "skin" && item.id !== "routine" && item.id !== "wellness"),
+  { id: "products", label: "Products" },
+  { id: "history", label: "History" },
+];
 
-export default function Sidebar({ active, onNavigate }) {
+export default function Sidebar({ active, onNavigate, demo = false }) {
+  const items = demo ? [{ id: "dashboard", label: "Demo Home" }, { id: "skin", label: "Demo Scan" }, { id: "routine", label: "Routine" }, { id: "products", label: "Products" }] : visibleNavItems;
   return (
     <>
       {/* Desktop / tablet: horizontal tab strip with an underline indicator */}
       <nav className="hidden sm:flex items-center gap-1 px-6 md:px-10 border-b border-line overflow-x-auto">
-        {visibleNavItems.map((item) => {
+        {items.map((item) => {
           const Icon = icons[item.id];
           const isActive = active === item.id;
           return (
@@ -51,7 +58,7 @@ export default function Sidebar({ active, onNavigate }) {
 
       {/* Mobile: fixed bottom navigation */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 glass border-t border-line px-2 py-2 flex justify-between">
-        {visibleNavItems.map((item) => {
+        {items.map((item) => {
           const Icon = icons[item.id];
           const isActive = active === item.id;
           return (

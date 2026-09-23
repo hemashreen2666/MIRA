@@ -6,3 +6,9 @@ def test_privacy_status(client):
     assert body["biometricStorage"] is False
     assert body["cloudProcessing"] is False
     assert body["localProcessing"] is True
+
+
+def test_history_requires_authentication(client):
+    client.headers.clear()
+    assert client.get("/api/v1/skin-analysis/history/me").status_code == 401
+    assert client.get("/api/v1/routine/history").status_code == 401

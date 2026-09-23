@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Square, Radio, CameraOff, Loader2 } from "lucide-react";
-import { runSkinAnalysis, runExpressionEstimate } from "../services/mira.js";
+import { runSkinAnalysis, runDemoSkinAnalysis, runExpressionEstimate } from "../services/mira.js";
 import { emitAnalysisComplete } from "../lib/analysisBus.js";
 
 // How often a frame is captured and sent to the local backend while
@@ -43,7 +43,7 @@ function timeAgo(date) {
   return `${mins}m ago`;
 }
 
-export default function MirrorView() {
+export default function MirrorView({ demo = false }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -93,8 +93,8 @@ export default function MirrorView() {
       const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.8));
       if (!blob) return;
 
-      const analysis = await runSkinAnalysis(blob);
-      runExpressionEstimate().catch(() => {}); // best-effort, keeps the card live
+      const analysis = demo ? await runDemoSkinAnalysis(blob) : await runSkinAnalysis(blob);
+      if (!demo) runExpressionEstimate().catch(() => {}); // authenticated-only persisted feature
       emitAnalysisComplete(analysis);
 
       const metrics = analysis.metrics || [];
@@ -111,7 +111,7 @@ export default function MirrorView() {
       busyRef.current = false;
       setPhase((p) => (p === "scanning" ? "live" : p));
     }
-  }, []);
+  }, [demo]);
 
   const start = useCallback(async () => {
     setCameraError(null);

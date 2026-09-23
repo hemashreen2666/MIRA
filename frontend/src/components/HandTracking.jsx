@@ -3,8 +3,7 @@ import {
   FilesetResolver,
   HandLandmarker,
 } from "@mediapipe/tasks-vision";
-import { Hand, Play } from "lucide-react";
-import { completeRoutineStep } from "../services/mira.js";
+import { Hand } from "lucide-react";
 
 const MEDIAPIPE_WASM =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm";
@@ -15,10 +14,12 @@ const HAND_MODEL =
 export default function HandTracking({
   steps = [],
   currentStep = 0,
-  setCurrentStep,
-  routineStarted = false,
-  setRoutineStarted,
-  onStepComplete,
+  enabled = false,
+  onCompleteCurrent,
+  onNextStep,
+  onStartResume,
+  onPause,
+  paused = false,
 }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -31,11 +32,18 @@ export default function HandTracking({
   const lastGestureRef = useRef("");
   const lastGestureTimeRef = useRef(0);
   const processingGestureRef = useRef(false);
+  const pausedRef = useRef(paused);
+  const onPauseRef = useRef(onPause);
+  const onStartResumeRef = useRef(onStartResume);
+  pausedRef.current = paused;
+  onPauseRef.current = onPause;
+  onStartResumeRef.current = onStartResume;
 
   const [loading, setLoading] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [handDetected, setHandDetected] = useState(false);
   const [gesture, setGesture] = useState("No hand");
+  const [detectedGesture, setDetectedGesture] = useState("No hand");
   const [error, setError] = useState("");
 
   const currentRoutineStep = steps[currentStep];
@@ -48,6 +56,13 @@ export default function HandTracking({
       stopTracking();
     };
   }, []);
+
+  // The hand camera is never active during the manual cleanse or the
+  // post-cleanse face scan.  It starts only for a live timed treatment.
+  useEffect(() => {
+    if (enabled && !cameraReady && !loading) startTracking();
+    if (!enabled && cameraReady) stopTracking();
+  }, [enabled, cameraReady, loading]);
 
   /*
    * Create MediaPipe Hand Landmarker.
@@ -117,8 +132,6 @@ export default function HandTracking({
       await video.play();
 
       setCameraReady(true);
-      setRoutineStarted?.(true);
-
       lastVideoTimeRef.current = -1;
 
       animationRef.current =
@@ -206,13 +219,33 @@ export default function HandTracking({
     );
   }
 
+  function fingerIsReliablyExtended(landmarks, mcp, pip, tip) {
+    const proximal = {
+      x: landmarks[pip].x - landmarks[mcp].x,
+      y: landmarks[pip].y - landmarks[mcp].y,
+      z: (landmarks[pip].z || 0) - (landmarks[mcp].z || 0),
+    };
+    const distal = {
+      x: landmarks[tip].x - landmarks[pip].x,
+      y: landmarks[tip].y - landmarks[pip].y,
+      z: (landmarks[tip].z || 0) - (landmarks[pip].z || 0),
+    };
+    const proximalLength = distance(landmarks[mcp], landmarks[pip]);
+    const distalLength = distance(landmarks[pip], landmarks[tip]);
+    const alignment =
+      (proximal.x * distal.x + proximal.y * distal.y + proximal.z * distal.z) /
+      Math.max(proximalLength * distalLength, 0.000001);
+
+    return alignment > 0.25 &&
+      distance(landmarks[mcp], landmarks[tip]) > proximalLength * 1.35;
+  }
+
   /*
    * Detect simple gestures.
    *
-   * OPEN_PALM  = ✋
    * NEXT       = ✌️
    * THUMBS_UP  = 👍
-   * FIST       = ✊
+   * FINGERS_CROSSED = 🤞
    */
   function detectGesture(landmarks) {
     const index = fingerIsExtended(
@@ -239,37 +272,31 @@ export default function HandTracking({
       18
     );
 
-    const thumb =
-      distance(
-        landmarks[4],
-        landmarks[17]
-      ) >
-      distance(
-        landmarks[3],
-        landmarks[17]
-      );
+    const indexMiddleOrderAtBase = landmarks[5].x - landmarks[9].x;
+    const indexMiddleOrderAtTips = landmarks[8].x - landmarks[12].x;
+    const fingersCrossed =
+      index &&
+      middle &&
+      !ring &&
+      !pinky &&
+      indexMiddleOrderAtBase * indexMiddleOrderAtTips < 0 &&
+      distance(landmarks[8], landmarks[12]) < distance(landmarks[0], landmarks[9]) * 0.55;
 
-    const extendedCount =
-      Number(index) +
-      Number(middle) +
-      Number(ring) +
-      Number(pinky);
+    if (fingersCrossed) return "FINGERS_CROSSED";
 
-    /*
-     * Open palm
-     */
-    if (extendedCount >= 4) {
-      return "OPEN_PALM";
-    }
+    const indexExtended = fingerIsReliablyExtended(landmarks, 5, 6, 8);
+    const middleExtended = fingerIsReliablyExtended(landmarks, 9, 10, 12);
+    const ringExtended = fingerIsReliablyExtended(landmarks, 13, 14, 16);
+    const pinkyExtended = fingerIsReliablyExtended(landmarks, 17, 18, 20);
 
     /*
      * Two fingers
      */
     if (
-      index &&
-      middle &&
-      !ring &&
-      !pinky
+      indexExtended &&
+      middleExtended &&
+      !ringExtended &&
+      !pinkyExtended
     ) {
       return "NEXT";
     }
@@ -277,18 +304,34 @@ export default function HandTracking({
     /*
      * Thumbs up
      */
+    const thumbVector = {
+      x: landmarks[4].x - landmarks[2].x,
+      y: landmarks[4].y - landmarks[2].y,
+      z: (landmarks[4].z || 0) - (landmarks[2].z || 0),
+    };
+    const palmAxis = {
+      x: landmarks[9].x - landmarks[0].x,
+      y: landmarks[9].y - landmarks[0].y,
+      z: (landmarks[9].z || 0) - (landmarks[0].z || 0),
+    };
+    const thumbLength = distance(landmarks[2], landmarks[4]);
+    const palmAxisLength = distance(landmarks[0], landmarks[9]);
+    const thumbAlignment =
+      (thumbVector.x * palmAxis.x + thumbVector.y * palmAxis.y + thumbVector.z * palmAxis.z) /
+      Math.max(thumbLength * palmAxisLength, 0.000001);
+    const thumbExtendedUp =
+      thumbLength > distance(landmarks[2], landmarks[3]) * 1.15 &&
+      thumbLength > palmAxisLength * 0.35 &&
+      thumbAlignment > 0.2;
+
     if (
-      thumb &&
-      extendedCount === 0
+      thumbExtendedUp &&
+      !indexExtended &&
+      !middleExtended &&
+      !ringExtended &&
+      !pinkyExtended
     ) {
       return "THUMBS_UP";
-    }
-
-    /*
-     * Closed fist
-     */
-    if (extendedCount === 0) {
-      return "FIST";
     }
 
     return "TRACKING";
@@ -300,13 +343,7 @@ export default function HandTracking({
   function canProcessGesture(newGesture) {
     const now = Date.now();
 
-    if (
-      newGesture ===
-        lastGestureRef.current &&
-      now -
-        lastGestureTimeRef.current <
-        1500
-    ) {
+    if (newGesture === lastGestureRef.current) {
       return false;
     }
 
@@ -325,7 +362,7 @@ export default function HandTracking({
   async function processGesture(
     newGesture
   ) {
-    if (!canProcessGesture(newGesture)) {
+    if (!enabled || !canProcessGesture(newGesture)) {
       return;
     }
 
@@ -341,54 +378,8 @@ export default function HandTracking({
     ) {
       setGesture("👍 Complete step");
 
-      const step =
-        steps[currentStep];
-
-      if (!step) {
-        return;
-      }
-
-      if (!step.complete) {
-        try {
-          processingGestureRef.current =
-            true;
-
-          await completeRoutineStep(
-            step.id,
-            true
-          );
-
-          onStepComplete?.(
-            step.id
-          );
-
-          /*
-           * Move to next step.
-           */
-          if (
-            currentStep <
-            steps.length - 1
-          ) {
-            setTimeout(() => {
-              setCurrentStep(
-                (prev) => prev + 1
-              );
-            }, 700);
-          }
-        } catch (err) {
-          console.error(
-            "Unable to complete routine step:",
-            err
-          );
-
-          setGesture(
-            "Unable to save step"
-          );
-        } finally {
-          processingGestureRef.current =
-            false;
-        }
-      }
+      processingGestureRef.current = true;
+      try { await onCompleteCurrent?.(); } finally { processingGestureRef.current = false; }
 
       return;
     }
@@ -401,45 +392,20 @@ export default function HandTracking({
     ) {
       setGesture("✌️ Next step");
 
-      if (
-        currentStep <
-        steps.length - 1
-      ) {
-        setCurrentStep(
-          (prev) => prev + 1
-        );
+      processingGestureRef.current = true;
+      try { await onNextStep?.(); } finally { processingGestureRef.current = false; }
+
+      return;
+    }
+
+    if (newGesture === "FINGERS_CROSSED") {
+      if (pausedRef.current) {
+        setGesture("Resumed");
+        onStartResumeRef.current?.();
+      } else {
+        setGesture("Paused");
+        onPauseRef.current?.();
       }
-
-      return;
-    }
-
-    /*
-     * ✋ Pause
-     */
-    if (
-      newGesture === "OPEN_PALM"
-    ) {
-      setGesture("✋ Pause");
-
-      setRoutineStarted?.(
-        false
-      );
-
-      return;
-    }
-
-    /*
-     * ✊ Resume
-     */
-    if (
-      newGesture === "FIST"
-    ) {
-      setGesture("✊ Resume");
-
-      setRoutineStarted?.(
-        true
-      );
-
       return;
     }
 
@@ -620,12 +586,16 @@ export default function HandTracking({
               landmarks
             );
 
+          setDetectedGesture(detectedGesture);
+
           processGesture(
             detectedGesture
           );
         } else {
           setHandDetected(false);
           setGesture("No hand");
+          setDetectedGesture("No hand");
+          lastGestureRef.current = "";
 
           const canvas =
             canvasRef.current;
@@ -696,8 +666,7 @@ export default function HandTracking({
             />
 
             <p className="text-sm text-ink-300">
-              Start the routine to activate
-              hand tracking
+              Hand tracking activates during timed steps
             </p>
           </div>
         )}
@@ -764,6 +733,9 @@ export default function HandTracking({
           <p className="text-sm font-medium text-cyan-300 mt-1">
             {gesture}
           </p>
+          <p className="text-[10.5px] text-ink-500 mt-1">
+            Detected gesture: {detectedGesture}
+          </p>
         </div>
 
         <div className="rounded-xl bg-base-900/60 border border-line px-3 py-3">
@@ -785,8 +757,7 @@ export default function HandTracking({
         </p>
 
         <p>
-          👍 Thumbs up — complete current
-          step
+          👍 Thumbs up — complete current step
         </p>
 
         <p>
@@ -794,28 +765,9 @@ export default function HandTracking({
         </p>
 
         <p>
-          ✋ Open palm — pause
-        </p>
-
-        <p>
-          ✊ Fist — resume
+          🤞 Fingers crossed — pause / resume
         </p>
       </div>
-
-      {/* Camera button */}
-      {!cameraReady && (
-        <button
-          onClick={startTracking}
-          disabled={loading}
-          className="mt-5 w-full rounded-xl bg-gradient-to-r from-cyan-500 to-azure-500 text-base-950 text-sm font-medium py-2.5 focus-ring flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          <Play size={16} />
-
-          {loading
-            ? "Starting Hand Tracking..."
-            : "Start Hand Tracking"}
-        </button>
-      )}
 
       {cameraReady && (
         <button

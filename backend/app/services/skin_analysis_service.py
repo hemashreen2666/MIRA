@@ -6,6 +6,7 @@ PRIVACY: the raw frame/image bytes passed in are processed only in-memory
 inside this request and are never written to disk or the database.
 """
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
@@ -28,8 +29,14 @@ METRIC_LABELS = {
     "darkCircles": "Dark Circles",
     "unevenTone": "Uneven Skin Tone",
     "brightness": "Facial Brightness",
+    "fatigue": "Fatigue",
     "oily": "Oily Appearance",
 }
+
+
+def as_utc(value: datetime) -> datetime:
+    """Return a database datetime as an explicit UTC instant for the API."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 def _metrics_from_row(row: SkinAnalysis, previous: Optional[SkinAnalysis]) -> list[SkinMetric]:
@@ -39,6 +46,7 @@ def _metrics_from_row(row: SkinAnalysis, previous: Optional[SkinAnalysis]) -> li
         "darkCircles": row.dark_circles_level,
         "unevenTone": row.uneven_skin_tone_level,
         "brightness": row.facial_brightness_level,
+        "fatigue": row.fatigue_level,
         "oily": row.oily_appearance_level,
     }
     prev_values = {
@@ -47,6 +55,7 @@ def _metrics_from_row(row: SkinAnalysis, previous: Optional[SkinAnalysis]) -> li
         "darkCircles": previous.dark_circles_level if previous else values["darkCircles"],
         "unevenTone": previous.uneven_skin_tone_level if previous else values["unevenTone"],
         "brightness": previous.facial_brightness_level if previous else values["brightness"],
+        "fatigue": previous.fatigue_level if previous else values["fatigue"],
         "oily": previous.oily_appearance_level if previous else values["oily"],
     }
     metrics = []
@@ -62,6 +71,32 @@ def _metrics_from_row(row: SkinAnalysis, previous: Optional[SkinAnalysis]) -> li
             )
         )
     return metrics
+
+
+def _metrics_from_scores(scores) -> list[SkinMetric]:
+    """Shape a current scan without consulting a previous record."""
+    values = {
+        "acne": scores.acne, "redness": scores.redness, "darkCircles": scores.dark_circles,
+        "unevenTone": scores.uneven_skin_tone, "brightness": scores.facial_brightness,
+        "fatigue": scores.dark_circles, "oily": scores.oily_appearance,
+    }
+    return [SkinMetric(id=key, label=METRIC_LABELS[key], value=score_to_level(score), level=score,
+                       trend=0, note="Visible Feature" if score < 34 else "Detected")
+            for key, score in values.items()]
+
+
+def run_demo_skin_analysis(image_bytes: Optional[bytes]):
+    """Run the normal CV pipeline but return only ephemeral current metrics."""
+    start = time.perf_counter()
+    if image_bytes:
+        frame = decode_image_bytes(image_bytes)
+        face = FaceDetector().detect(frame)
+        region = crop_face_region(frame, face.x, face.y, face.w, face.h) if face else frame
+        scores = get_skin_analyzer(prefer_camera_pipeline=True).analyze(region)
+    else:
+        scores = get_skin_analyzer(prefer_camera_pipeline=False).analyze(None)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    return uuid.uuid4(), datetime.now(timezone.utc), scores, _metrics_from_scores(scores), elapsed_ms
 
 
 def run_skin_analysis(db: Session, user_id: UUID, image_bytes: Optional[bytes]) -> tuple[SkinAnalysis, list[SkinMetric]]:
@@ -87,6 +122,7 @@ def run_skin_analysis(db: Session, user_id: UUID, image_bytes: Optional[bytes]) 
 
     elapsed_ms = (time.perf_counter() - start) * 1000
 
+    analyzed_at = datetime.now(timezone.utc)
     row = SkinAnalysis(
         user_id=user_id,
         acne_level=scores.acne,
@@ -94,11 +130,15 @@ def run_skin_analysis(db: Session, user_id: UUID, image_bytes: Optional[bytes]) 
         dark_circles_level=scores.dark_circles,
         uneven_skin_tone_level=scores.uneven_skin_tone,
         facial_brightness_level=scores.facial_brightness,
+        fatigue_level=scores.dark_circles,
         oily_appearance_level=scores.oily_appearance,
         analysis_version="demo-0.1",
         processing_time_ms=elapsed_ms,
-        recorded_date=datetime.now().strftime("%d/%m/%Y"),
-        recorded_time=datetime.now().strftime("%I:%M %p"),
+        analyzed_at=analyzed_at,
+        # Keep these legacy fields coherent for old local installations. The
+        # History page exclusively uses analyzed_at.
+        recorded_date=analyzed_at.strftime("%d/%m/%Y"),
+        recorded_time=analyzed_at.strftime("%I:%M %p"),
     )
     db.add(row)
     db.flush()
@@ -107,7 +147,7 @@ def run_skin_analysis(db: Session, user_id: UUID, image_bytes: Optional[bytes]) 
         db.execute(
             select(SkinAnalysis)
             .where(SkinAnalysis.user_id == user_id, SkinAnalysis.id != row.id)
-            .order_by(SkinAnalysis.timestamp.desc())
+            .order_by(SkinAnalysis.analyzed_at.desc())
             .limit(1)
         )
         .scalars()
@@ -127,7 +167,7 @@ def get_latest_skin_analysis(db: Session, user_id: UUID):
         db.execute(
             select(SkinAnalysis)
             .where(SkinAnalysis.user_id == user_id)
-            .order_by(SkinAnalysis.timestamp.desc())
+            .order_by(SkinAnalysis.analyzed_at.desc())
             .limit(1)
         )
         .scalars()
@@ -139,7 +179,7 @@ def get_latest_skin_analysis(db: Session, user_id: UUID):
         db.execute(
             select(SkinAnalysis)
             .where(SkinAnalysis.user_id == user_id, SkinAnalysis.id != row.id)
-            .order_by(SkinAnalysis.timestamp.desc())
+            .order_by(SkinAnalysis.analyzed_at.desc())
             .limit(1)
         )
         .scalars()
@@ -158,7 +198,7 @@ def get_skin_analysis_history(db: Session, user_id: UUID, page: int, page_size: 
         db.execute(
             select(SkinAnalysis)
             .where(SkinAnalysis.user_id == user_id)
-            .order_by(SkinAnalysis.timestamp.desc())
+            .order_by(SkinAnalysis.analyzed_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         )

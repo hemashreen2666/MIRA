@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck, Video, User } from "lucide-react";
 
-export default function Header({ home = false, auth = false, onDemoUser, onLogin }) {
+export default function Header({ home = false, auth = false, demo = false, onDemoUser, onLogin }) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -54,6 +54,7 @@ export default function Header({ home = false, auth = false, onDemoUser, onLogin
         </div>
       ) : auth ? null : (
       <div className="flex items-center gap-3 md:gap-5">
+        {demo && <button type="button" onClick={onLogin} className="rounded-full border border-cyan-400/40 px-3 py-1.5 text-xs font-semibold text-cyan-300 focus-ring">Demo Mode · Login</button>}
         <div
           className="hidden md:flex items-center gap-2 rounded-full border border-line px-3 py-1.5 glass"
           title="Your data stays on this device."
@@ -69,12 +70,12 @@ export default function Header({ home = false, auth = false, onDemoUser, onLogin
 
         <p className="md:hidden font-mono text-sm text-ink-200 tabular">{clock}</p>
 
-        <button
+        {!demo && <button
           className="h-8 w-8 rounded-full bg-base-800 border border-line flex items-center justify-center focus-ring shrink-0"
           aria-label="Profile"
         >
           <User size={15} className="text-ink-200" />
-        </button>
+        </button>}
       </div>
       )}
     </header>

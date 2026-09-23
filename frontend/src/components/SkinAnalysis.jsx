@@ -10,7 +10,7 @@ import {
   TrendingUp,
   Minus,
 } from "lucide-react";
-import { getSkinAnalysis } from "../services/mira.js";
+import { getDemoScan, getSkinAnalysis } from "../services/mira.js";
 import { useAnalysisComplete } from "../lib/analysisBus.js";
 
 const icons = {
@@ -19,6 +19,7 @@ const icons = {
   darkCircles: Moon,
   unevenTone: Palette,
   brightness: Sun,
+  fatigue: Moon,
   oily: Droplets,
 };
 
@@ -28,14 +29,14 @@ const toneMap = {
   Low: { text: "text-moss-400", ring: "#4FBD84" },
 };
 
-export default function SkinAnalysis({ compact = false }) {
+export default function SkinAnalysis({ compact = false, demo = false }) {
   const [metrics, setMetrics] = useState([]);
 
   const load = useCallback(() => {
-    getSkinAnalysis()
+    (demo ? Promise.resolve(getDemoScan()?.metrics || []) : getSkinAnalysis())
       .then(setMetrics)
       .catch(() => {});
-  }, []);
+  }, [demo]);
 
   useEffect(() => {
     load();
@@ -69,7 +70,7 @@ export default function SkinAnalysis({ compact = false }) {
                 <p className="text-xs text-ink-400 truncate">{m.label}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className={`font-display font-semibold text-[15px] ${tone.text}`}>{m.value}</p>
-                  <TrendBadge value={m.trend} />
+                  {!demo && <TrendBadge value={m.trend} />}
                 </div>
                 <p className="text-[10px] font-mono text-ink-500 mt-1">{m.note}</p>
               </div>
@@ -77,6 +78,7 @@ export default function SkinAnalysis({ compact = false }) {
           );
         })}
       </div>
+
     </div>
   );
 }

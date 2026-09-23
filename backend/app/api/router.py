@@ -9,6 +9,9 @@ from app.api.routes import (
     routine,
     wellness,
     privacy,
+    auth,
+    products,
+    skin_insights,
 )
 
 # health check is mounted at the root (not under /api/v1) in main.py
@@ -20,3 +23,6 @@ v1_router.include_router(recommendations.router)
 v1_router.include_router(routine.router)
 v1_router.include_router(wellness.router)
 v1_router.include_router(privacy.router)
+v1_router.include_router(auth.router)
+v1_router.include_router(products.router)
+v1_router.include_router(skin_insights.router)

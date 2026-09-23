@@ -1,5 +1,11 @@
+import { useState } from "react";
+
+import { loginUser, registerUser } from "../services/mira.js";
+
 export default function AuthPage({ mode, onNavigate }) {
   const isRegister = mode === "register";
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const fields = isRegister
     ? [
         { id: "name", label: "Name", type: "text", autoComplete: "name" },
@@ -12,6 +18,28 @@ export default function AuthPage({ mode, onNavigate }) {
         { id: "password", label: "Password", type: "password", autoComplete: "current-password" },
       ];
 
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSubmitting(true);
+
+    const form = new FormData(event.currentTarget);
+    const payload = Object.fromEntries(form.entries());
+
+    try {
+      if (isRegister) {
+        await registerUser(payload);
+      } else {
+        await loginUser(payload);
+      }
+      onNavigate("dashboard");
+    } catch (err) {
+      setError(err?.message || "Unable to continue.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className="mx-auto flex min-h-[calc(100vh-105px)] max-w-[1440px] items-center justify-center px-6 py-14 md:px-10">
       <section className="w-full max-w-md rounded-[28px] border border-line bg-base-850 p-7 shadow-[0_24px_70px_rgba(0,0,0,0.18)] sm:p-9">
@@ -23,7 +51,7 @@ export default function AuthPage({ mode, onNavigate }) {
           {isRegister ? "Set up your private MIRA profile." : "Sign in to continue to your mirror."}
         </p>
 
-        <form className="mt-7 space-y-4" onSubmit={(event) => { event.preventDefault(); onNavigate(isRegister ? "login" : "dashboard"); }}>
+        <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
           {fields.map((field) => (
             <label key={field.id} className="block text-sm font-medium text-ink-200">
               {field.label}
@@ -37,8 +65,14 @@ export default function AuthPage({ mode, onNavigate }) {
             </label>
           ))}
 
-          <button type="submit" className="mt-2 h-11 w-full rounded-xl bg-gradient-to-r from-cyan-400 to-azure-500 text-sm font-semibold text-base-950 transition-opacity hover:opacity-90 focus-ring">
-            {isRegister ? "Create account" : "Login"}
+          {error && (
+            <p className="rounded-xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" disabled={submitting} className="mt-2 h-11 w-full rounded-xl bg-gradient-to-r from-cyan-400 to-azure-500 text-sm font-semibold text-base-950 transition-opacity hover:opacity-90 disabled:opacity-60 focus-ring">
+            {submitting ? "Please wait..." : isRegister ? "Create account" : "Login"}
           </button>
         </form>
 

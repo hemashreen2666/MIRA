@@ -8,6 +8,8 @@ export default function VoiceAssistant({
   setRoutineStarted,
   setCurrentStep,
   onCompleteStep,
+  onNextStep,
+  onStartResume,
 }) {
   const [listening, setListening] = useState(false);
   const [message, setMessage] = useState("Click the microphone and speak");
@@ -96,8 +98,11 @@ export default function VoiceAssistant({
         return;
       }
 
-      setRoutineStarted(true);
-      setCurrentStep(0);
+      if (onStartResume) onStartResume();
+      else {
+        setRoutineStarted(true);
+        setCurrentStep(0);
+      }
 
       setMessage("Routine started");
       speak("Routine started");
@@ -115,6 +120,11 @@ export default function VoiceAssistant({
         return;
       }
 
+      if (onNextStep) {
+        onNextStep();
+        speak("Completing this step and preparing the next one");
+        return;
+      }
       setCurrentStep((prev) => {
         const next = prev + 1;
 
@@ -152,7 +162,7 @@ export default function VoiceAssistant({
 
         speak("Step completed");
 
-        if (currentStep < steps.length - 1) {
+        if (!onCompleteStep && currentStep < steps.length - 1) {
           setCurrentStep((prev) => prev + 1);
         } else {
           setRoutineStarted(false);

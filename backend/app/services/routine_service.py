@@ -9,7 +9,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.routine import SkincareRoutine, RoutineStep, RoutineProgress
+from app.models.routine import SkincareRoutine, RoutineStep, RoutineProgress, RoutineTaskProgress
+from app.models.user_product import UserProduct
 
 
 def get_or_create_default_routine(db: Session, user_id: UUID) -> SkincareRoutine:
@@ -63,6 +64,25 @@ def get_routine_progress(db: Session, user_id: UUID):
     return routine, steps, percent
 
 
+def sync_optional_treatment_step(db: Session, user_id: UUID) -> None:
+    """Show Treatment only when this user owns a treatment-category product."""
+    routine = get_or_create_default_routine(db, user_id)
+    should_show = db.execute(select(UserProduct).where(UserProduct.user_id == user_id, UserProduct.routine_step == "TREATMENT").limit(1)).scalars().first() is not None
+    steps = _steps_for(db, routine.id)
+    treatment = next((step for step in steps if step.title == "Treatment"), None)
+    if should_show and not treatment:
+        for step in steps:
+            if step.order_index >= 3: step.order_index += 1
+        db.add(RoutineStep(routine_id=routine.id, order_index=3, title="Treatment", description="Apply your selected treatment product as directed.", duration="1 min", complete=False))
+        db.commit()
+    elif not should_show and treatment:
+        db.delete(treatment)
+        db.flush()
+        for step in _steps_for(db, routine.id):
+            if step.order_index > 3: step.order_index -= 1
+        db.commit()
+
+
 def complete_step(db: Session, user_id: UUID, order_index: int, complete: bool = True):
     """
     `order_index` matches the frontend's stable step id (1..N), not the
@@ -84,6 +104,7 @@ def complete_step(db: Session, user_id: UUID, order_index: int, complete: bool =
     step.complete = complete
     step.completed_at = datetime.now(timezone.utc) if complete else None
     db.commit()
+    _record_task_progress(db, user_id, step.routine_id, step.title, complete)
 
     steps = _steps_for(db, step.routine_id)
     completed = sum(1 for s in steps if s.complete)
@@ -132,3 +153,27 @@ def _record_daily_progress(db: Session, user_id: UUID, routine_id: UUID, complet
             percent_complete=percent,
         ))
     db.commit()
+
+
+def _record_task_progress(db: Session, user_id: UUID, routine_id: UUID, task_name: str, complete: bool):
+    db.add(RoutineTaskProgress(
+        user_id=user_id,
+        routine_id=routine_id,
+        progress_date=date.today(),
+        task_name=task_name,
+        complete=complete,
+    ))
+    db.commit()
+
+
+def get_task_progress_history(db: Session, user_id: UUID, limit: int = 50):
+    return (
+        db.execute(
+            select(RoutineTaskProgress)
+            .where(RoutineTaskProgress.user_id == user_id)
+            .order_by(RoutineTaskProgress.created_at.desc())
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )

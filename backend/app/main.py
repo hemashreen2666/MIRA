@@ -5,7 +5,7 @@ Existing React Frontend
         -> FastAPI REST API   (this file wires it up)
         -> Business/AI Service Layer   (app/services)
         -> Computer Vision / ML Models (app/cv, app/ml)
-        -> PostgreSQL Database          (app/models via SQLAlchemy)
+        -> SQLite Database             (app/models via SQLAlchemy)
 """
 from contextlib import asynccontextmanager
 
@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.core.database import create_db_and_tables
 from app.core.logging import configure_logging, get_logger
 from app.api.router import v1_router
 from app.api.routes import health
@@ -26,6 +27,7 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     logger.info("MIRA backend starting up (env=%s)", settings.APP_ENV)
+    create_db_and_tables()
     yield
 
 

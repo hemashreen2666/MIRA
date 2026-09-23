@@ -7,7 +7,6 @@ Create Date: 2026-09-03
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision = "0001"
 down_revision = None
@@ -18,7 +17,7 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
         sa.Column("display_name", sa.String(80), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -26,8 +25,8 @@ def upgrade() -> None:
 
     op.create_table(
         "skin_analysis",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("acne_level", sa.Integer, nullable=False),
         sa.Column("redness_level", sa.Integer, nullable=False),
         sa.Column("dark_circles_level", sa.Integer, nullable=False),
@@ -44,8 +43,8 @@ def upgrade() -> None:
 
     op.create_table(
         "facial_expression_analysis",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("expression", sa.String(20), nullable=False),
         sa.Column("confidence", sa.Float, nullable=False),
         sa.Column("timestamp", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -55,9 +54,9 @@ def upgrade() -> None:
 
     op.create_table(
         "recommendations",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("analysis_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("skin_analysis.id"), nullable=True),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("analysis_id", sa.Uuid(as_uuid=True), sa.ForeignKey("skin_analysis.id"), nullable=True),
         sa.Column("slug", sa.String(40), nullable=False),
         sa.Column("title", sa.String(120), nullable=False),
         sa.Column("body", sa.Text, nullable=False),
@@ -70,8 +69,8 @@ def upgrade() -> None:
 
     op.create_table(
         "skincare_routines",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("name", sa.String(80), server_default="Daily Routine"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
@@ -79,8 +78,8 @@ def upgrade() -> None:
 
     op.create_table(
         "routine_steps",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("routine_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("skincare_routines.id"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("routine_id", sa.Uuid(as_uuid=True), sa.ForeignKey("skincare_routines.id"), nullable=False),
         sa.Column("order_index", sa.Integer, nullable=False),
         sa.Column("title", sa.String(80), nullable=False),
         sa.Column("description", sa.Text, nullable=False),
@@ -92,9 +91,9 @@ def upgrade() -> None:
 
     op.create_table(
         "routine_progress",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("routine_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("skincare_routines.id"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("routine_id", sa.Uuid(as_uuid=True), sa.ForeignKey("skincare_routines.id"), nullable=False),
         sa.Column("progress_date", sa.Date, nullable=False),
         sa.Column("completed_steps", sa.Integer, server_default="0"),
         sa.Column("total_steps", sa.Integer, server_default="0"),
@@ -106,8 +105,8 @@ def upgrade() -> None:
 
     op.create_table(
         "wellness_insights",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("id", sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column("user_id", sa.Uuid(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("insight_date", sa.Date, nullable=False),
         sa.Column("consistency", sa.Integer, nullable=False),
         sa.Column("brightness", sa.Integer, nullable=False),

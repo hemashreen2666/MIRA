@@ -46,6 +46,7 @@ def run():
                 analysis_version="demo-0.1",
                 processing_time_ms=random.uniform(80, 220),
                 timestamp=datetime.now(timezone.utc) - timedelta(days=i),
+                analyzed_at=datetime.now(timezone.utc) - timedelta(days=i),
             ))
         db.commit()
 

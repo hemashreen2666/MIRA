@@ -35,14 +35,21 @@ class SkinMetric(BaseModel):
 
 class SkinAnalysisResponse(BaseModel):
     analysis_id: UUID
-    timestamp: datetime
+    analyzed_at: datetime
     metrics: List[SkinMetric]
+    recommendation: str | None = None
+
+
+class DemoSkinAnalysisResponse(SkinAnalysisResponse):
+    """A temporary, anonymous current scan. It is never persisted."""
+    demo_scan_id: UUID
 
 
 class SkinAnalysisHistoryItem(BaseModel):
     analysis_id: UUID
-    timestamp: datetime
+    analyzed_at: datetime
     metrics: List[SkinMetric]
+    recommendation: str | None = None
 
 
 class SkinAnalysisHistoryResponse(BaseModel):

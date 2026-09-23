@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.routine import RoutineProgress, RoutineStep, SkincareRoutine
 from app.models.skin_analysis import SkinAnalysis
+from app.services.skin_analysis_service import as_utc
 
 DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -31,15 +32,15 @@ def get_wellness_insights(db: Session, user_id: UUID, days: int = 7):
     analysis_rows = (
         db.execute(
             select(SkinAnalysis)
-            .where(SkinAnalysis.user_id == user_id, SkinAnalysis.timestamp >= since)
-            .order_by(SkinAnalysis.timestamp)
+            .where(SkinAnalysis.user_id == user_id, SkinAnalysis.analyzed_at >= since)
+            .order_by(SkinAnalysis.analyzed_at)
         )
         .scalars()
         .all()
     )
     brightness_by_date = {}
     for row in analysis_rows:
-        brightness_by_date[row.timestamp.date()] = row.facial_brightness_level
+        brightness_by_date[as_utc(row.analyzed_at).date()] = row.facial_brightness_level
 
     trend = []
     for i in range(days):

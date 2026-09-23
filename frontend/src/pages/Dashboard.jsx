@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   ListChecks,
@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 
 import VoiceAssistant from "../components/VoiceAssistant";
+import { getPersonalizedSkinInsights } from "../services/mira.js";
 
 const launchCards = [
   {
@@ -32,7 +33,13 @@ const launchCards = [
   },
 ];
 
-export default function Dashboard({ onNavigate }) {
+export default function Dashboard({ onNavigate, demo = false }) {
+
+  const [insights, setInsights] = useState(null);
+
+  useEffect(() => {
+    if (!demo) getPersonalizedSkinInsights().then(setInsights).catch(() => setInsights(null));
+  }, [demo]);
 
   // -----------------------------------
   // Routine state
@@ -119,9 +126,51 @@ export default function Dashboard({ onNavigate }) {
           DASHBOARD CARDS
       ====================================== */}
 
+      {demo ? (
+        <section className="mb-6 rounded-[28px] border border-cyan-400/20 bg-cyan-400/5 p-6 md:p-8">
+          <p className="font-display text-2xl font-semibold text-ink-50">Welcome to MIRA 👋</p>
+          <p className="mt-2 text-sm text-ink-400">Try MIRA's AI Skin Analysis. Your demo scan is temporary and is not saved to an account.</p>
+          <button type="button" onClick={() => onNavigate("skin")} className="mt-5 rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-base-950 focus-ring">Start Demo Scan</button>
+        </section>
+      ) : insights && (
+        <section className="mb-6 rounded-[28px] border border-line bg-base-850 p-6 md:p-8">
+          <p className="font-display text-2xl font-semibold text-ink-50">{insights.greeting}</p>
+          <p className="mt-1 text-sm text-ink-400">{insights.welcome}</p>
+          {!insights.has_analysis ? (
+            <div className="mt-5 rounded-2xl border border-line bg-base-900/50 p-4 text-sm text-ink-300">{insights.progress_message}</div>
+          ) : (
+            <div className="mt-6 grid gap-5 lg:grid-cols-[1.3fr_1fr]">
+              <div>
+                <h2 className="font-display text-lg font-semibold">My Skin Progress</h2>
+                <p className="mt-1 text-xs text-ink-400">{insights.progress_message}</p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {insights.metrics.map((metric) => (
+                    <div key={metric.id} className="rounded-xl border border-line bg-base-900/50 p-3">
+                      <p className="text-xs text-ink-400">{metric.label}</p>
+                      <p className="mt-1 text-sm font-semibold text-ink-100">Current: {metric.current}</p>
+                      <p className="text-xs text-ink-400">{metric.previous === null ? "Trend: Not enough data" : `Previous: ${metric.previous} · ${metric.trend.replaceAll("_", " ")}`}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5">
+                <h2 className="font-display text-lg font-semibold">Today's Reminder</h2>
+                <ul className="mt-3 space-y-3 text-sm leading-6 text-ink-200">
+                  {insights.reminders.map((reminder) => <li key={`${reminder.type}-${reminder.routine_step}`}>{reminder.message}</li>)}
+                </ul>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button type="button" onClick={() => onNavigate("routine")} className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-base-950 focus-ring">Start My Skincare Routine</button>
+                  <button type="button" onClick={() => onNavigate("history")} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink-200 focus-ring">View My History</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="grid min-h-[420px] grid-cols-1 gap-6 lg:grid-cols-2">
 
-        {launchCards.map(
+        {(demo ? launchCards.filter((card) => card.id === "skin") : launchCards).map(
           ({
             id,
             title,

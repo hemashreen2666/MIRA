@@ -45,5 +45,9 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
+        response = c.post("/api/v1/auth/register", json={
+            "name": "Test User", "username": "testuser", "email": "test@example.test", "password": "test-password",
+        })
+        c.headers.update({"Authorization": f"Bearer {response.json()['token']}"})
         yield c
     app.dependency_overrides.clear()
